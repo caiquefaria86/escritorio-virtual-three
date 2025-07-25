@@ -5,13 +5,28 @@ import { scene } from '../core/sceneManager';
 let marker;
 
 function createMarker() {
-    const geometry = new THREE.OctahedronGeometry(0.3, 0);
-    const material = new THREE.MeshBasicMaterial({
+    const geometry = new THREE.OctahedronGeometry(0.23, 0);
+
+    // Material para o corpo sólido e translúcido
+    const solidMaterial = new THREE.MeshBasicMaterial({
         color: 0x00ff00,
         transparent: true,
         opacity: 0.5
     });
-    marker = new THREE.Mesh(geometry, material);
+    const solidMesh = new THREE.Mesh(geometry, solidMaterial);
+
+    // Material para o contorno (wireframe)
+    const wireframeMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffffff, // Cor branca para o contorno
+        wireframe: true
+    });
+    const wireframeMesh = new THREE.Mesh(geometry, wireframeMaterial);
+
+    // Agrupa os dois meshes para que se comportem como um único objeto
+    marker = new THREE.Group();
+    marker.add(solidMesh);
+    marker.add(wireframeMesh);
+
     marker.visible = false;
     scene.add(marker);
 }
@@ -31,7 +46,7 @@ function showMarker(visible) {
 
 function updateMarker() {
     if (marker && marker.visible) {
-        marker.rotation.y += 0.01;
+        marker.rotation.y += 0.05;
     }
 }
 
