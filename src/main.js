@@ -6,11 +6,11 @@ import { loadCharacter, updateCharacter, getModelPosition, setTarget } from './m
 import { loadRoom, getRoomBoundingBox } from './models/room.js';
 import { getCharacterModel } from './models/character.js';
 import { loadAllProps } from './models/props/index.js';
-// import CannonDebugger from 'cannon-es-debugger';
+import { createMarker, updateMarker } from './models/marker.js';
+import CannonDebugger from 'cannon-es-debugger';
 import { stepPhysics, updatePhysicsMeshes, world, registerPhysicsObject, createGroundBox, initPhysics } from './core/physics.js';
-import * as CANNON from 'cannon-es';
 
-// const cannonDebugger = CannonDebugger(scene, world, { color: 0x00ff00 });
+let cannonDebugger;
 
 let isObserving = false;
 const keysPressed = {};
@@ -28,6 +28,8 @@ let floor;
 let clock = new THREE.Clock();
 
 initPhysics(); // Inicializa o mundo Cannon antes de tudo
+cannonDebugger = CannonDebugger(scene, world, { color: 0x00ff00 });
+createMarker();
 
 // Função para criar o chão visual e físico
 async function setupGround() {
@@ -49,7 +51,7 @@ async function setupGround() {
         color: 0x00ff00, // Uma cor visível
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.3
+        opacity: 0.3 
       })
     );
     floor.rotation.x = -Math.PI / 2;
@@ -82,7 +84,9 @@ setupGround().then(() => {
     const delta = clock.getDelta();
     stepPhysics(delta);
     updatePhysicsMeshes();
+    cannonDebugger.update();
     updateCharacter(delta, keysPressed);
+    updateMarker();
 
     const model = getCharacterModel();
     if (model) {

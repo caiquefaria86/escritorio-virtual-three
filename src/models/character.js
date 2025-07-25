@@ -3,10 +3,12 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { scene } from '../core/sceneManager.js';
 import * as CANNON from 'cannon-es';
 import { world, initPhysics, createPlayerBody, updatePhysicsMeshes } from '../core/physics.js';
+import { showMarker } from './marker.js';
 
 const loader = new GLTFLoader();
 let model, mixer, walkAction, idleAction, targetPosition = null;
 let playerBody;
+let characterSize; // Variável para armazenar o tamanho do personagem
 
 export function loadCharacter(path = '/models/scene.gltf') {
   return new Promise((resolve) => {
@@ -22,9 +24,15 @@ export function loadCharacter(path = '/models/scene.gltf') {
         idleAction.play();
       }
 
+      // Calcula o tamanho do modelo para o corpo físico
+      const box = new THREE.Box3().setFromObject(model);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      characterSize = size;
+
       // Inicializa física e corpo do player
       if (!world) initPhysics();
-      playerBody = createPlayerBody(new CANNON.Vec3(model.position.x, model.position.y + 1, model.position.z));
+      playerBody = createPlayerBody(size, new CANNON.Vec3(0, 5, 0));
       world.addBody(playerBody);
 
       resolve({ model });
@@ -58,12 +66,10 @@ export function updateCharacter(deltaTime, keysPressed) {
 
   // Movimento por clique
   if (targetPosition && model) {
-    console.log('Movendo para o alvo:', targetPosition, 'Posição atual:', playerBody.position);
     const currentPos = new THREE.Vector3().copy(playerBody.position);
     const dir = targetPosition.clone().sub(currentPos);
     dir.y = 0; // Ignoramos a diferença de altura para o movimento no plano XZ
     const distance = dir.length();
-    console.log(dir.y);
 
     if (distance > 0.1) {
       const angle = Math.atan2(dir.x, dir.z);
@@ -76,11 +82,14 @@ export function updateCharacter(deltaTime, keysPressed) {
     } else {
       // Chegou ao destino
       targetPosition = null;
+      showMarker(false);
     }
   }
 
   // Sincroniza modelo com corpo físico
   model.position.copy(playerBody.position);
+  // Ajusta a posição Y do modelo visual para compensar a diferença entre o centro do corpo físico e a base do modelo visual
+  model.position.y -= characterSize.y / 2;
 
   // Animations
   if (isMoving) {

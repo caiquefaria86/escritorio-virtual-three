@@ -24,6 +24,6 @@ export function loadChair(position = new THREE.Vector3(0, 0, 0), rotationY = 0) 
   });
 }
 
-export function getTableBoundingBoxes() {
-  return tableBoxes;
+export function getChairBoundingBoxes() {
+  return chairBoxes;
 }

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { camera } from '../core/sceneManager.js';
+import { setMarkerPosition, showMarker } from '../models/marker.js';
 
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
@@ -13,7 +14,10 @@ export function setupMouseClick(rendererDom, floor, onClickPosition) {
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObject(floor);
     if (intersects.length > 0) {
-      onClickPosition(intersects[0].point.clone());
+      const point = intersects[0].point.clone();
+      onClickPosition(point);
+      setMarkerPosition(point);
+      showMarker(true);
     }
   });
 }
