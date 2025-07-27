@@ -11,7 +11,7 @@ function createMarker() {
     const solidMaterial = new THREE.MeshBasicMaterial({
         color: 0x00ff00,
         transparent: true,
-        opacity: 0.5
+        opacity: 0.4
     });
     const solidMesh = new THREE.Mesh(geometry, solidMaterial);
 

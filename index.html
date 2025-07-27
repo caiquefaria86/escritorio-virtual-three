@@ -5,9 +5,88 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Meu Escritório Virtual</title>
     <link rel="stylesheet" href="/src/style.css">
+    <style>
+      /* Estilos básicos para os formulários */
+      .auth-container {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.8);
+        padding: 20px;
+        border-radius: 8px;
+        color: white;
+        text-align: center;
+        z-index: 1000;
+      }
+      .auth-container h2 {
+        margin-bottom: 20px;
+      }
+      .auth-container input {
+        display: block;
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: 4px;
+        border: none;
+      }
+      .auth-container button {
+        background: #4CAF50;
+        color: white;
+        padding: 10px 15px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+      }
+      .auth-container button:hover {
+        background: #45a049;
+      }
+      .auth-container .toggle-link {
+        margin-top: 15px;
+        color: #bbb;
+        cursor: pointer;
+        text-decoration: underline;
+      }
+      .message-container {
+        position: absolute;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 5px;
+        display: none; /* Hidden by default */
+        z-index: 1001;
+      }
+    </style>
   </head>
   <body>
     <canvas class="webgl"></canvas>
+
+    <div id="auth-forms" class="auth-container">
+      <div id="login-form">
+        <h2>Login</h2>
+        <input type="email" id="login-email" placeholder="Email" required>
+        <input type="password" id="login-password" placeholder="Password" required>
+        <button id="login-button">Login</button>
+        <p class="toggle-link" data-form="register">Don't have an account? Register here.</p>
+      </div>
+
+      <div id="register-form" style="display: none;">
+        <h2>Register</h2>
+        <input type="text" id="register-name" placeholder="Name" required>
+        <input type="email" id="register-email" placeholder="Email" required>
+        <input type="password" id="register-password" placeholder="Password" required>
+        <input type="password" id="register-password-confirmation" placeholder="Confirm Password" required>
+        <button id="register-button">Register</button>
+        <p class="toggle-link" data-form="login">Already have an account? Login here.</p>
+      </div>
+    </div>
+
+    <div id="message-container" class="message-container"></div>
+
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

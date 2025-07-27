@@ -5,9 +5,9 @@ import { createStaticBox, createDynamicBox } from '../../core/physics.js';
 
 // Lista de todos os objetos a serem carregados na cena
 const propsToLoad = [
-  { name: 'table1', type: 'static', loader: loadTable, position: new THREE.Vector3(0, 0, -1), rotation: 0 },
+  { name: 'table1', type: 'static', loader: loadTable, position: new THREE.Vector3(-1, 0, -1), rotation: 0 },
   { name: 'table2', type: 'static', loader: loadTable, position: new THREE.Vector3(5, 0, -1), rotation: 0 },
-    { name: 'table2', type: 'static', loader: loadTable, position: new THREE.Vector3(10, 0, -1), rotation: 0 },
+  { name: 'table3', type: 'static', loader: loadTable, position: new THREE.Vector3(10, 0, -1), rotation: 0 },
   { name: 'chair3', type: 'dynamic', loader: loadChair, position: new THREE.Vector3(8.9, 0, -1.5), rotation: 0 },
   { name: 'chair4', type: 'dynamic', loader: loadChair, position: new THREE.Vector3(8.9, 0, 2), rotation: 0 },
   // Adicione mais objetos aqui para carregar de forma inteligente

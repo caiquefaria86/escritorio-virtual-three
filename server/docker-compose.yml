@@ -1,0 +1,44 @@
+
+version: '3.8'
+
+services:
+  # Application Service (PHP-FPM)
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: virtual-office-app
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      - ./src:/var/www/html
+    networks:
+      - virtual-office-network
+
+  # Nginx Service
+  nginx:
+    image: nginx:alpine
+    container_name: virtual-office-nginx
+    restart: unless-stopped
+    ports:
+      - "8003:80" # HTTP port for Laravel app
+      - "8080:8080" # WebSocket port for Reverb
+    volumes:
+      - ./src:/var/www/html
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - virtual-office-network
+    depends_on:
+      - app
+
+  # Redis Service
+  redis:
+    image: redis:alpine
+    container_name: virtual-office-redis
+    restart: unless-stopped
+    networks:
+      - virtual-office-network
+
+networks:
+  virtual-office-network:
+    driver: bridge
