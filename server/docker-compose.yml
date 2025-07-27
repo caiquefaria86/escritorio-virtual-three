@@ -30,6 +30,23 @@ services:
       - virtual-office-network
     depends_on:
       - app
+      - reverb
+
+  # Reverb Service
+  reverb:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: virtual-office-reverb
+    restart: unless-stopped
+    working_dir: /var/www/html
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
+    volumes:
+      - ./src:/var/www/html
+    networks:
+      - virtual-office-network
+    depends_on:
+      - app
 
   # Redis Service
   redis:

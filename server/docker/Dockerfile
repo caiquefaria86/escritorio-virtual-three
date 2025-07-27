@@ -19,7 +19,9 @@ RUN apk add --no-cache \
     libzip-dev \
     oniguruma-dev \
     # Extensions for Laravel
-    && docker-php-ext-install pdo pdo_mysql mbstring exif pcntl bcmath zip
+    && docker-php-ext-install pdo pdo_mysql exif pcntl bcmath zip \
+    && docker-php-ext-install mbstring \
+    && docker-php-ext-enable mbstring
 
 # Install PECL extensions
 RUN pecl install redis && docker-php-ext-enable redis

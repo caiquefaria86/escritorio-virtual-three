@@ -1,3 +1,19 @@
+import Echo from 'laravel-echo';
+import Pusher from 'pusher-js';
+
+window.Pusher = Pusher;
+
+window.echo = new Echo({
+    broadcaster: 'reverb',
+    key: 'yr2oc4brce7lpp6ncgs7', // REVERB_APP_KEY from .env
+    wsHost: window.location.hostname, // Or 'localhost' if always local
+    wsPort: 8080, // REVERB_PORT from .env
+    wssPort: 8080, // REVERB_PORT from .env
+    forceTLS: false, // Set to true if using HTTPS
+    disableStats: true,
+    enabledTransports: ['ws', 'wss'],
+});
+
 // --- Lógica de Autenticação ---
 const authForms = document.getElementById('auth-forms');
 const loginFormDiv = document.getElementById('login-form');
@@ -43,53 +59,68 @@ async function getCsrfToken() {
         await fetch(`${LARAVEL_BACKEND_URL}/sanctum/csrf-cookie`, {
             credentials: 'include'
         });
-        console.log('Token CSRF obtido com sucesso.');
-        // O token CSRF é automaticamente enviado em cookies subsequentes
+        // Adiciona uma pequena espera para garantir que o cookie seja definido e o retorna
+        return new Promise(resolve => {
+            setTimeout(() => {
+                const token = getCookie('XSRF-TOKEN');
+                console.log('Token CSRF obtido com sucesso:', token);
+                resolve(token);
+            }, 100); // 100ms de espera
+        });
     } catch (error) {
         console.error('Erro ao obter o token CSRF:', error);
         showMessage('Erro de conexão com o servidor.', 'error');
+        return null;
     }
 }
 
 async function loginUser(email, password) {
-    await getCsrfToken();
+    const tokenParaEnviar = await getCsrfToken();
+    if (!tokenParaEnviar) {
+        showMessage('Não foi possível obter o token de segurança. Tente novamente.', 'error');
+        return;
+    }
+
     try {
+        console.log(`Token que SERÁ ENVIADO na request: `, tokenParaEnviar);
         const response = await fetch(`${LARAVEL_BACKEND_URL}/login`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
-
+                'X-XSRF-TOKEN': tokenParaEnviar
             },
             body: JSON.stringify({ email, password }),
             credentials: 'include',
         });
 
+        // O cookie XSRF-TOKEN pode ser renovado após o login, então vamos pegá-lo novamente
+        const newToken = getCookie('XSRF-TOKEN');
+        console.log(`Response token aqui: `, newToken);
+
         const data = await response.json();
+        console.log('Resposta do servidor:', data);
 
         if (response.ok) {
-            // Laravel Sanctum não retorna um token diretamente no /login
-            // Ele usa cookies para autenticação de SPA.
-            // Para usar com o Echo, precisamos de um token de API.
-            // Vamos gerar um token após o login bem-sucedido.
             const tokenResponse = await fetch(`${LARAVEL_BACKEND_URL}/api/user/token`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
-                    'X-XSRF-TOKEN': getCookie('XSRF-TOKEN') // Obter o token do cookie
+                    'X-XSRF-TOKEN': newToken // Usar o token mais recente
                 },
                 body: JSON.stringify({ name: 'auth_token', abilities: ['*'] }),
+                credentials: 'include', // Necessário para enviar o cookie de sessão
             });
 
             const tokenData = await tokenResponse.json();
+            console.log('Token de API gerado:', tokenData);
 
             if (tokenResponse.ok && tokenData.token) {
                 localStorage.setItem('auth_token', tokenData.token);
                 showMessage('Login bem-sucedido!', 'success');
                 hideAuthForms();
-                // Recarregar a página ou inicializar a cena 3D
-                window.location.reload(); // Simples para recarregar e iniciar a cena
+                window.location.reload();
             } else {
                 showMessage('Erro ao gerar token de API.', 'error');
             }
@@ -103,18 +134,25 @@ async function loginUser(email, password) {
 }
 
 async function registerUser(name, email, password, passwordConfirmation) {
-    await getCsrfToken();
+    const tokenParaEnviar = await getCsrfToken();
+    if (!tokenParaEnviar) {
+        showMessage('Não foi possível obter o token de segurança. Tente novamente.', 'error');
+        return;
+    }
+
     try {
         const response = await fetch(`${LARAVEL_BACKEND_URL}/register`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
-
+                'X-XSRF-TOKEN': tokenParaEnviar
             },
             body: JSON.stringify({ name, email, password, password_confirmation: passwordConfirmation }),
             credentials: 'include',
         });
+
+        console.log(`Response token aqui: `, getCookie('XSRF-TOKEN'));
 
         const data = await response.json();
 
@@ -135,7 +173,13 @@ async function registerUser(name, email, password, passwordConfirmation) {
 function getCookie(name) {
     const value = `; ${document.cookie}`;
     const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop().split(';').shift();
+    if (parts.length === 2) {
+        const token = parts.pop().split(';').shift();
+        // O token do cookie está URL-encoded, então precisamos decodificá-lo
+        const decodedToken = decodeURIComponent(token);
+        console.log(`Decoded csrf token value --  ${decodedToken}`);
+        return decodedToken;
+    }
 }
 
 // Event Listeners
@@ -181,22 +225,6 @@ if (authToken) {
 }
 
 // --- Fim da Lógica de Autenticação ---
-
-import Echo from 'laravel-echo';
-import Pusher from 'pusher-js';
-
-window.Pusher = Pusher;
-
-window.echo = new Echo({
-    broadcaster: 'reverb',
-    key: 'yr2oc4brce7lpp6ncgs7', // REVERB_APP_KEY from .env
-    wsHost: window.location.hostname, // Or 'localhost' if always local
-    wsPort: 8080, // REVERB_PORT from .env
-    wssPort: 8080, // REVERB_PORT from .env
-    forceTLS: false, // Set to true if using HTTPS
-    disableStats: true,
-    enabledTransports: ['ws', 'wss'],
-});
 
 import * as THREE from 'three';
 import { scene, camera, renderer } from './core/sceneManager.js';

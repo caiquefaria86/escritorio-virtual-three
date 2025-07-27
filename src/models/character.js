@@ -95,6 +95,23 @@ export function updateCharacter(deltaTime, keysPressed) {
   if (isMoving) {
     idleAction?.stop();
     walkAction?.play();
+
+    // --- LOG PARA MULTIPLAYER ---
+    // Envia os dados de movimento para o backend aqui
+    console.log({
+      position: { 
+        x: playerBody.position.x.toFixed(2),
+        y: playerBody.position.y.toFixed(2),
+        z: playerBody.position.z.toFixed(2)
+      },
+      rotation: { 
+        x: model.rotation.x.toFixed(2),
+        y: model.rotation.y.toFixed(2),
+        z: model.rotation.z.toFixed(2)
+      }
+    });
+    // --- FIM DO LOG ---
+
   } else {
     walkAction?.stop();
     idleAction?.play();
@@ -110,7 +127,6 @@ export function getModelPosition() {
 }
 
 export function setTarget(position) {
-  console.log("Novo alvo definido em:", position);
   targetPosition = position;
 }
 
