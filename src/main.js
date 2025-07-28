@@ -1,6 +1,8 @@
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
 
+const LARAVEL_BACKEND_URL = 'http://localhost:8003'; // Mover para o topo
+
 window.Pusher = Pusher;
 
 window.echo = new Echo({
@@ -12,6 +14,7 @@ window.echo = new Echo({
     forceTLS: false, // Set to true if using HTTPS
     disableStats: true,
     enabledTransports: ['ws', 'wss'],
+    authEndpoint: `${LARAVEL_BACKEND_URL}/broadcasting/auth`, // Adiciona o endpoint de autenticação
 });
 
 // --- Lógica de Autenticação ---
@@ -33,7 +36,8 @@ const registerButton = document.getElementById('register-button');
 
 const toggleLinks = document.querySelectorAll('.toggle-link');
 
-const LARAVEL_BACKEND_URL = 'http://localhost:8003';
+let floor;
+let clock = new THREE.Clock();
 
 function showMessage(message, type = 'info') {
     messageContainer.textContent = message;
@@ -211,15 +215,105 @@ toggleLinks.forEach(link => {
 
 // Verificar se já está autenticado
 const authToken = localStorage.getItem('auth_token');
+const otherPlayers = {}; // Objeto para armazenar outros jogadores
+
 if (authToken) {
     hideAuthForms();
+    console.log('Usuário já autenticado, token:', authToken);
     // Se já autenticado, configure o Echo com o token
     echo.options.auth = {
         headers: {
             Authorization: `Bearer ${authToken}`,
         },
     };
+
+    echo.join('office')
+        .here(async (users) => {
+            console.log('Usuários online:', users);
+            // Renderiza todos os usuários que já estão na sala
+            for (const user of users) {
+                // Não renderiza o próprio usuário
+                if (user.id === echo.connector.pusher.connection.options.auth.params.user_id) continue;
+
+                const { model, mixer, walkAction, idleAction } = await loadPlayerModel(`/models/scene.gltf`);
+                scene.add(model);
+                otherPlayers[user.id] = { model, mixer, walkAction, idleAction, lastPosition: null };
+
+                // Define a posição inicial se disponível
+                if (user.position && user.rotation) {
+                    model.position.set(user.position.x, user.position.y, user.position.z);
+                    model.rotation.set(user.rotation.x, user.rotation.y, user.rotation.z);
+                }
+            }
+        })
+        .joining(async (user) => {
+            console.log('Novo usuário:', user);
+            // Não renderiza o próprio usuário
+            if (user.id === echo.connector.pusher.connection.options.auth.params.user_id) return;
+
+            const { model, mixer, walkAction, idleAction } = await loadPlayerModel(`/models/scene.gltf`);
+            scene.add(model);
+            otherPlayers[user.id] = { model, mixer, walkAction, idleAction, lastPosition: null };
+
+            // Define a posição inicial se disponível
+            if (user.position && user.rotation) {
+                model.position.set(user.position.x, user.position.y, user.position.z);
+                model.rotation.set(user.rotation.x, user.rotation.y, user.rotation.z);
+            }
+        })
+        .leaving((user) => {
+            console.log('Usuário saiu:', user);
+            // Remove o usuário que saiu da sala
+            const player = otherPlayers[user.id];
+            if (player && player.model) {
+                scene.remove(player.model);
+                delete otherPlayers[user.id];
+            }
+        })
+        .listen('PlayerMoved', (e) => {
+            // console.log('PlayerMoved event:', e);
+            const player = otherPlayers[e.user.id];
+            if (player && player.model) {
+                const { model, mixer, walkAction, idleAction, lastPosition } = player;
+
+                // Atualiza posição e rotação
+                model.position.set(e.position.x, e.position.y, e.position.z);
+                model.rotation.set(e.rotation.x, e.rotation.y, e.rotation.z);
+
+                // Lógica de animação para outros jogadores
+                if (lastPosition) {
+                    const distance = model.position.distanceTo(lastPosition);
+                    if (distance > 0.01) { // Se moveu o suficiente
+                        idleAction?.stop();
+                        walkAction?.play();
+                    } else {
+                        walkAction?.stop();
+                        idleAction?.play();
+                    }
+                } else {
+                    // Primeira atualização, assume que está parado
+                    walkAction?.stop();
+                    idleAction?.play();
+                }
+                player.lastPosition = model.position.clone();
+            }
+        });
+
     echo.connect(); // Reconecta o Echo com o token
+
+    // Loop de atualização para mixers de outros jogadores
+    const animateOtherPlayers = () => {
+        const deltaTime = clock.getDelta();
+        for (const playerId in otherPlayers) {
+            const player = otherPlayers[playerId];
+            if (player.mixer) {
+                player.mixer.update(deltaTime);
+            }
+        }
+        requestAnimationFrame(animateOtherPlayers);
+    };
+    animateOtherPlayers();
+
 } else {
     showAuthForms();
 }
@@ -252,8 +346,6 @@ document.addEventListener('keyup', (e) => {
   if (e.code === 'Space') isObserving = false;
 });
 
-let floor;
-let clock = new THREE.Clock();
 
 initPhysics(); // Inicializa o mundo Cannon antes de tudo
 cannonDebugger = CannonDebugger(scene, world, { color: 0x00ff00 });
@@ -301,15 +393,22 @@ async function setupGround() {
     directional2.position.set(-10, 12, 0);
     scene.add(directional1);
     scene.add(directional2);
+
+    return box.min.y; // Retorna a altura mínima do chão
   }
+  return 0; // Retorna 0 ou um valor padrão se o box não for encontrado
 }
 
 // Fluxo organizado: chão -> personagem -> loop -> props
-setupGround().then(() => {
-  return loadCharacter();
+setupGround().then((groundY) => {
+  return loadCharacter('/models/scene.gltf', groundY); // Passa a altura do chão
 }).then(() => {
   const loop = () => {
-    const delta = clock.getDelta();
+    let delta = clock.getDelta();
+    // Garante um delta mínimo para a simulação avançar
+    if (delta === 0) {
+        delta = 1 / 60; // Força um delta de 60 FPS se for zero
+    }
     stepPhysics(delta);
     updatePhysicsMeshes();
     cannonDebugger.update();

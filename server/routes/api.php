@@ -20,9 +20,3 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 });
 
 Route::middleware('auth:sanctum')->post('/player/movement', [PlayerController::class, 'updateMovement']);
-
-Route::middleware(['auth:sanctum'])->post('/user/token', function (Request $request) {
-    $token = $request->user()->createToken($request->token_name ?? 'auth_token', $request->abilities ?? ['*']);
-
-    return ['token' => $token->plainTextToken];
-});

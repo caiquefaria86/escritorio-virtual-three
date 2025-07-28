@@ -2,70 +2,105 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { scene } from '../core/sceneManager.js';
 import * as CANNON from 'cannon-es';
-import { world, initPhysics, createPlayerBody, updatePhysicsMeshes } from '../core/physics.js';
+import { world, initPhysics, createPlayerBody, registerPhysicsObject } from '../core/physics.js';
 import { showMarker } from './marker.js';
 
-const loader = new GLTFLoader();
-let model, mixer, walkAction, idleAction, targetPosition = null;
-let playerBody;
-let characterSize; // Variável para armazenar o tamanho do personagem
+// Função auxiliar para obter cookies (necessário para XSRF-TOKEN)
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) {
+        const token = parts.pop().split(';').shift();
+        // O token do cookie está URL-encoded, então precisamos decodificá-lo
+        const decodedToken = decodeURIComponent(token);
+        return decodedToken;
+    }
+}
 
-export function loadCharacter(path = '/models/scene.gltf') {
-  return new Promise((resolve) => {
-    loader.load(path, (gltf) => {
-      model = gltf.scene;
-      scene.add(model);
-      mixer = new THREE.AnimationMixer(model);
+const gltfLoader = new GLTFLoader();
 
-      walkAction = mixer.clipAction(gltf.animations[0]);
+// Função genérica para carregar um modelo de jogador
+export function loadPlayerModel(path = '/models/scene.gltf') {
+  return new Promise((resolve, reject) => {
+    gltfLoader.load(path, (gltf) => {
+      const model = gltf.scene;
+      const mixer = new THREE.AnimationMixer(model);
+
+      const walkAction = mixer.clipAction(gltf.animations[0]);
       const idleClip = THREE.AnimationClip.findByName(gltf.animations, 'Idle');
-      if (idleClip) {
-        idleAction = mixer.clipAction(idleClip);
-        idleAction.play();
-      }
+      const idleAction = idleClip ? mixer.clipAction(idleClip) : null;
 
-      // Calcula o tamanho do modelo para o corpo físico
-      const box = new THREE.Box3().setFromObject(model);
-      const size = new THREE.Vector3();
-      box.getSize(size);
-      characterSize = size;
+      if (idleAction) idleAction.play();
 
-      // Inicializa física e corpo do player
-      if (!world) initPhysics();
-      playerBody = createPlayerBody(size, new CANNON.Vec3(0, 5, 0));
-      world.addBody(playerBody);
-
-      resolve({ model });
-    });
+      resolve({ model, mixer, walkAction, idleAction });
+    }, undefined, reject);
   });
 }
 
-export function updateCharacter(deltaTime, keysPressed) {
-  if (!model || !mixer || !playerBody) return;
+let localPlayerModel, localPlayerMixer, localPlayerWalkAction, localPlayerIdleAction, targetPosition = null;
+let playerBody;
+let characterSize; // Variável para armazenar o tamanho do personagem
 
-  const moveSpeed = 4 * deltaTime;
-  const rotationSpeed = 3 * deltaTime;
+export function loadCharacter(path = '/models/scene.gltf', groundY = 0) {
+  return new Promise(async (resolve) => {
+    const { model, mixer, walkAction, idleAction } = await loadPlayerModel(path);
+    localPlayerModel = model;
+    localPlayerMixer = mixer;
+    localPlayerWalkAction = walkAction;
+    localPlayerIdleAction = idleAction;
+
+    scene.add(localPlayerModel);
+
+    // Calcula o tamanho do modelo para o corpo físico
+    const box = new THREE.Box3().setFromObject(localPlayerModel);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    characterSize = size;
+
+    // Inicializa física e corpo do player
+    if (!world) initPhysics();
+    // Posiciona o corpo físico um pouco acima do chão
+    playerBody = createPlayerBody(size, new CANNON.Vec3(0, groundY + size.y / 2 + 0.1, 0));
+    // world.addBody(playerBody); // REMOVIDO: Já é adicionado por registerPhysicsObject
+
+    // REGISTRA O JOGADOR LOCAL COM O SISTEMA DE FÍSICA
+    registerPhysicsObject('localPlayer', localPlayerModel, playerBody, characterSize.y);
+
+    resolve({ model: localPlayerModel });
+  });
+}
+
+let lastSentTime = 0;
+const throttleInterval = 100; // ms
+
+export function updateCharacter(deltaTime, keysPressed) {
+  if (!localPlayerModel || !localPlayerMixer || !playerBody) return;
+
+  const moveSpeed = 15; // Unidades por segundo
+  const rotationSpeed = 2 * deltaTime;
   let isMoving = false;
 
-  // Movimento físico
+  // // Zera a velocidade horizontal no início do frame para garantir que pare quando não houver input
+  playerBody.velocity.x = 0;
+  playerBody.velocity.z = 0;
+
+  // Movimento por teclas
   if (keysPressed['arrowleft']) {
-    model.rotation.y += rotationSpeed;
-    isMoving = true;
+    localPlayerModel.rotation.y += rotationSpeed;
   }
   if (keysPressed['arrowright']) {
-    model.rotation.y -= rotationSpeed;
-    isMoving = true;
+    localPlayerModel.rotation.y -= rotationSpeed;
   }
   if (keysPressed['arrowup']) {
     // Calcula direção de movimento
-    const dir = new THREE.Vector3(0, 0, 1).applyQuaternion(model.quaternion);
-    playerBody.position.x += dir.x * moveSpeed;
-    playerBody.position.z += dir.z * moveSpeed;
+    const dir = new THREE.Vector3(0, 0, 1).applyQuaternion(localPlayerModel.quaternion);
+    playerBody.velocity.x = dir.x * moveSpeed;
+    playerBody.velocity.z = dir.z * moveSpeed;
     isMoving = true;
   }
 
   // Movimento por clique
-  if (targetPosition && model) {
+  if (targetPosition && localPlayerModel) {
     const currentPos = new THREE.Vector3().copy(playerBody.position);
     const dir = targetPosition.clone().sub(currentPos);
     dir.y = 0; // Ignoramos a diferença de altura para o movimento no plano XZ
@@ -73,56 +108,67 @@ export function updateCharacter(deltaTime, keysPressed) {
 
     if (distance > 0.1) {
       const angle = Math.atan2(dir.x, dir.z);
-      model.rotation.y = angle;
+      localPlayerModel.rotation.y = angle;
 
       dir.normalize();
-      playerBody.position.x += dir.x * moveSpeed;
-      playerBody.position.z += dir.z * moveSpeed;
+      playerBody.velocity.x = dir.x * moveSpeed;
+      playerBody.velocity.z = dir.z * moveSpeed;
       isMoving = true;
     } else {
       // Chegou ao destino
       targetPosition = null;
       showMarker(false);
+      isMoving = false;
     }
   }
 
-  // Sincroniza modelo com corpo físico
-  model.position.copy(playerBody.position);
-  // Ajusta a posição Y do modelo visual para compensar a diferença entre o centro do corpo físico e a base do modelo visual
-  model.position.y -= characterSize.y / 2;
-
   // Animations
   if (isMoving) {
-    idleAction?.stop();
-    walkAction?.play();
+    localPlayerIdleAction?.stop();
+    localPlayerWalkAction?.play();
 
-    // --- LOG PARA MULTIPLAYER ---
-    // Envia os dados de movimento para o backend aqui
-    console.log({
-      position: { 
-        x: playerBody.position.x.toFixed(2),
-        y: playerBody.position.y.toFixed(2),
-        z: playerBody.position.z.toFixed(2)
-      },
-      rotation: { 
-        x: model.rotation.x.toFixed(2),
-        y: model.rotation.y.toFixed(2),
-        z: model.rotation.z.toFixed(2)
-      }
-    });
-    // --- FIM DO LOG ---
+    // Envia dados de movimento para o backend (com throttling)
+    const now = Date.now();
+    if (now - lastSentTime > throttleInterval) {
+      lastSentTime = now;
+      const movementData = {
+        position: { 
+          x: parseFloat(playerBody.position.x.toFixed(2)),
+          y: parseFloat(playerBody.position.y.toFixed(2)),
+          z: parseFloat(playerBody.position.z.toFixed(2))
+        },
+        rotation: { 
+          x: parseFloat(localPlayerModel.rotation.x.toFixed(2)),
+          y: parseFloat(localPlayerModel.rotation.y.toFixed(2)),
+          z: parseFloat(localPlayerModel.rotation.z.toFixed(2))
+        }
+      };
+
+      fetch('http://localhost:8003/api/player/movement', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+          'X-XSRF-TOKEN': getCookie('XSRF-TOKEN'),
+          'X-Requested-With': 'XMLHttpRequest' // Adiciona este cabeçalho
+        },
+        body: JSON.stringify(movementData),
+        credentials: 'include' // Garante que os cookies sejam enviados
+      }).catch(console.error);
+    }
 
   } else {
-    walkAction?.stop();
-    idleAction?.play();
+    localPlayerWalkAction?.stop();
+    localPlayerIdleAction?.play();
   }
 
-  mixer.update(deltaTime);
+  localPlayerMixer.update(deltaTime);
 }
 
 export function getModelPosition() {
   const pos = new THREE.Vector3();
-  model.getWorldPosition(pos);
+  localPlayerModel.getWorldPosition(pos);
   return pos;
 }
 
@@ -131,5 +177,6 @@ export function setTarget(position) {
 }
 
 export function getCharacterModel() {
-  return model;
+  return localPlayerModel;
 }
+
