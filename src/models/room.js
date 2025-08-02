@@ -19,8 +19,6 @@ export function loadRoom(path = '/models/room.glb') {
         // (opcional) debug do tamanho:
         const size = new THREE.Vector3();
         roomBoundingBox.getSize(size);
-        console.log('Room size:', size);
-
         resolve(room);
       },
       undefined,

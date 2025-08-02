@@ -38,6 +38,7 @@ const toggleLinks = document.querySelectorAll('.toggle-link');
 
 let floor;
 let clock = new THREE.Clock();
+let deltaTime = clock.getDelta();
 
 function showMessage(message, type = 'info') {
     messageContainer.textContent = message;
@@ -303,7 +304,7 @@ if (authToken) {
 
     // Loop de atualização para mixers de outros jogadores
     const animateOtherPlayers = () => {
-        const deltaTime = clock.getDelta();
+        
         for (const playerId in otherPlayers) {
             const player = otherPlayers[playerId];
             if (player.mixer) {
@@ -404,15 +405,16 @@ setupGround().then((groundY) => {
   return loadCharacter('/models/scene.gltf', groundY); // Passa a altura do chão
 }).then(() => {
   const loop = () => {
-    let delta = clock.getDelta();
+    deltaTime = clock.getDelta();
     // Garante um delta mínimo para a simulação avançar
-    if (delta === 0) {
-        delta = 1 / 60; // Força um delta de 60 FPS se for zero
+    if (deltaTime === 0) {
+        deltaTime = 1 / 60; // Força um delta de 60 FPS se for zero
     }
-    stepPhysics(delta);
+
+    stepPhysics(deltaTime);
     updatePhysicsMeshes();
     cannonDebugger.update();
-    updateCharacter(delta, keysPressed);
+    updateCharacter(deltaTime, keysPressed);
     updateMarker();
 
     const model = getCharacterModel();

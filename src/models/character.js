@@ -11,7 +11,6 @@ function getCookie(name) {
     const parts = value.split(`; ${name}=`);
     if (parts.length === 2) {
         const token = parts.pop().split(';').shift();
-        // O token do cookie está URL-encoded, então precisamos decodificá-lo
         const decodedToken = decodeURIComponent(token);
         return decodedToken;
     }
@@ -39,7 +38,7 @@ export function loadPlayerModel(path = '/models/scene.gltf') {
 
 let localPlayerModel, localPlayerMixer, localPlayerWalkAction, localPlayerIdleAction, targetPosition = null;
 let playerBody;
-let characterSize; // Variável para armazenar o tamanho do personagem
+let characterSize;
 
 export function loadCharacter(path = '/models/scene.gltf', groundY = 0) {
   return new Promise(async (resolve) => {
@@ -61,11 +60,9 @@ export function loadCharacter(path = '/models/scene.gltf', groundY = 0) {
     if (!world) initPhysics();
     // Posiciona o corpo físico um pouco acima do chão
     playerBody = createPlayerBody(size, new CANNON.Vec3(0, groundY + size.y / 2 + 0.1, 0));
-    // world.addBody(playerBody); // REMOVIDO: Já é adicionado por registerPhysicsObject
 
     // REGISTRA O JOGADOR LOCAL COM O SISTEMA DE FÍSICA
     registerPhysicsObject('localPlayer', localPlayerModel, playerBody, characterSize.y);
-
     resolve({ model: localPlayerModel });
   });
 }
@@ -91,6 +88,7 @@ export function updateCharacter(deltaTime, keysPressed) {
   if (keysPressed['arrowright']) {
     localPlayerModel.rotation.y -= rotationSpeed;
   }
+  
   if (keysPressed['arrowup']) {
     // Calcula direção de movimento
     const dir = new THREE.Vector3(0, 0, 1).applyQuaternion(localPlayerModel.quaternion);
@@ -115,7 +113,6 @@ export function updateCharacter(deltaTime, keysPressed) {
       playerBody.velocity.z = dir.z * moveSpeed;
       isMoving = true;
     } else {
-      // Chegou ao destino
       targetPosition = null;
       showMarker(false);
       isMoving = false;
@@ -151,7 +148,7 @@ export function updateCharacter(deltaTime, keysPressed) {
           'Accept': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
           'X-XSRF-TOKEN': getCookie('XSRF-TOKEN'),
-          'X-Requested-With': 'XMLHttpRequest' // Adiciona este cabeçalho
+          'X-Requested-With': 'XMLHttpRequest'
         },
         body: JSON.stringify(movementData),
         credentials: 'include' // Garante que os cookies sejam enviados

@@ -19,19 +19,10 @@ export function stepPhysics(delta) {
     // Garante um delta mínimo para a simulação avançar
     const fixedTimeStep = 1 / 60; // 60 Hz
     const maxSubSteps = 10; // Limita o número de sub-passos para evitar espirais da morte
-    
-    console.log(`stepPhysics: delta=${delta.toFixed(4)}`);
+  
     const playerEntry = bodies.get('localPlayer');
-    if (playerEntry && playerEntry.body) {
-      console.log(`playerBody velocity BEFORE step: x=${playerEntry.body.velocity.x.toFixed(2)}, y=${playerEntry.body.velocity.y.toFixed(2)}, z=${playerEntry.body.velocity.z.toFixed(2)}`);
-    }
     
     world.step(fixedTimeStep, delta, maxSubSteps);
-
-    // Adiciona log para depuração da posição do playerBody após o passo da física
-    if (playerEntry && playerEntry.body) {
-      console.log(`playerBody position AFTER step: x=${playerEntry.body.position.x.toFixed(2)}, y=${playerEntry.body.position.y.toFixed(2)}, z=${playerEntry.body.position.z.toFixed(2)}`);
-    }
   }
 }
 
@@ -42,17 +33,12 @@ export function registerPhysicsObject(name, mesh, body, height = 0) {
 }
 
 export function updatePhysicsMeshes() {
-  console.log('updatePhysicsMeshes called. Registered bodies:', Array.from(bodies.keys()));
   for (const { mesh, body, height } of bodies.values()) {
     mesh.position.copy(body.position);
     mesh.quaternion.copy(body.quaternion);
     // Aplica o offset vertical para alinhar a base do modelo com o centro do corpo físico
     if (height > 0) {
       mesh.position.y -= height / 2;
-    }
-    // Adiciona log para depuração
-    if (body.mass > 0) { // Apenas para corpos dinâmicos (personagem)
-      console.log(`Body ${body.id} position: x=${body.position.x.toFixed(2)}, y=${body.position.y.toFixed(2)}, z=${body.position.z.toFixed(2)}`);
     }
   }
 }
@@ -107,7 +93,7 @@ export function createPlayerBody(size, initialPosition = new CANNON.Vec3(0, 1, 0
     mass: 50,
     position: initialPosition,
     shape,
-    fixedRotation: true,
+    fixedRotation: true, // Removido para permitir rotação do corpo físico
     allowSleep: false, // Impede que o corpo do personagem durma
   });
 
